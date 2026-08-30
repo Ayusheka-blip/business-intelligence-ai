@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.4.0",
+  "name": "Enterprise_ECommerce_Semantic_Contract",
+  "last_updated": "2026-08-30T10:00:00Z",
+  "governance_owner": "Data Governance & Financial Analytics Board",
+  "kpis": {
+    "net_revenue": {
+      "display_name": "Net Revenue",
+      "unit": "EUR",
+      "category": "Financial Performance",
+      "formula": "SUM(order_gross_amount - discounts_applied - refunds_issued)",
+      "grain": "hourly_stream_and_daily_rollup",
+      "refresh_cadence": "1_minute_stream",
+      "owner": "VP of Revenue Operations",
+      "sla_latency_seconds": 60,
+      "materiality_threshold": {
+        "relative_delta_pct": 5.0,
+        "absolute_dollar_threshold": 25000.0,
+        "statistical_z_score": 2.2
+      },
+      "upstream_lineage": [
+        "stream_db.checkout_events",
+        "warehouse_olap.dim_discounts",
+        "warehouse_olap.fact_refunds"
+      ],
+      "access_entitlement": "public_business_tier",
+      "dimensions": ["region", "channel", "category", "device"]
+    },
+    "checkout_conversion_rate": {
+      "display_name": "Checkout Conversion Rate",
+      "unit": "percentage",
+      "category": "Product & Engineering",
+      "formula": "COUNT(successful_checkouts) / COUNT(cart_checkouts_initiated) * 100",
+      "grain": "5_minute_stream",
+      "refresh_cadence": "5_minute_stream",
+      "owner": "Head of Product & Platform Engineering",
+      "sla_latency_seconds": 300,
+      "materiality_threshold": {
+        "relative_delta_pct": 3.0,
+        "statistical_z_score": 2.5
+      },
+      "upstream_lineage": [
+        "stream_db.checkout_gateway_telemetry",
+        "stream_db.session_logs"
+      ],
+      "access_entitlement": "public_business_tier",
+      "dimensions": ["region", "gateway_provider", "device", "payment_method"]
+    },
+    "stockout_rate": {
+      "display_name": "Top-100 SKU Stockout Rate",
+      "unit": "percentage",
+      "category": "Supply Chain & Operations",
+      "formula": "COUNT(out_of_stock_top_skus) / 100 * 100",
+      "grain": "daily_snapshot",
+      "refresh_cadence": "daily_batch_0400_utc",
+      "owner": "Director of Supply Chain & Logistics",
+      "sla_latency_seconds": 86400,
+      "materiality_threshold": {
+        "relative_delta_pct": 4.0,
+        "statistical_z_score": 2.0
+      },
+      "upstream_lineage": [
+        "erp_db.warehouse_inventory_daily",
+        "erp_db.supplier_shipments"
+      ],
+      "access_entitlement": "operations_and_above",
+      "dimensions": ["warehouse_id", "region", "product_tier", "supplier_id"]
+    },
+    "customer_nps": {
+      "display_name": "Customer Net Promoter Score (NPS)",
+      "unit": "score_index",
+      "category": "Customer Experience",
+      "formula": "(COUNT(promoters_9_10) - COUNT(detractors_0_6)) / COUNT(total_responses) * 100",
+      "grain": "weekly_rollup",
+      "refresh_cadence": "weekly_batch_sunday_midnight",
+      "owner": "Head of Customer Support & CX",
+      "sla_latency_seconds": 604800,
+      "materiality_threshold": {
+        "relative_delta_pct": 5.0,
+        "statistical_z_score": 1.96
+      },
+      "upstream_lineage": [
+        "crm_db.surveys_nps_weekly",
+        "crm_db.support_tickets_sentiment"
+      ],
+      "access_entitlement": "marketing_and_above",
+      "dimensions": ["customer_cohort", "issue_type", "region", "ticket_tier"]
+    },
+    "gross_margin_pct": {
+      "display_name": "Gross Profit Margin %",
+      "unit": "percentage",
+      "category": "Confidential Finance",
+      "formula": "(SUM(net_revenue) - SUM(cogs + direct_fulfillment_cost)) / SUM(net_revenue) * 100",
+      "grain": "daily_rollup",
+      "refresh_cadence": "daily_batch_0600_utc",
+      "owner": "Chief Financial Officer",
+      "sla_latency_seconds": 86400,
+      "materiality_threshold": {
+        "relative_delta_pct": 2.0,
+        "statistical_z_score": 2.0
+      },
+      "upstream_lineage": [
+        "erp_db.supplier_cogs_master",
+        "warehouse_olap.fact_orders",
+        "logistics_db.freight_invoices"
+      ],
+      "access_entitlement": "executive_and_finance_only",
+      "sensitive_masked_roles": ["operations_lead", "growth_marketer"],
+      "dimensions": ["region", "category", "supplier_tier"]
+    }
+  },
+  "roles_and_entitlements": {
+    "executive_vp": {
+      "display_name": "Executive VP / Leadership",
+      "allowed_kpis": ["net_revenue", "checkout_conversion_rate", "stockout_rate", "customer_nps", "gross_margin_pct"],
+      "unmasked_fields": ["margin_value", "supplier_cost", "executive_pricing_strategy"],
+      "masked_fields": [],
+      "action_decision_rights": ["capital_reallocation", "executive_vendor_escalation", "strategic_repricing", "operational_overtime"],
+      "narrative_focus": "Executive variance summary, top financial drivers, macro turnaround strategy, risk and capital allocation."
+    },
+    "operations_lead": {
+      "display_name": "Supply Chain & Operations Manager",
+      "allowed_kpis": ["net_revenue", "checkout_conversion_rate", "stockout_rate", "gross_margin_pct"],
+      "unmasked_fields": ["stock_levels", "warehouse_bottlenecks", "gateway_error_codes", "carrier_delays"],
+      "masked_fields": ["gross_margin_pct"],
+      "action_decision_rights": ["warehouse_rerouting", "gateway_failover_trigger", "safety_stock_reorder", "carrier_expedited_dispatch"],
+      "narrative_focus": "Technical errors, fulfillment bottlenecks, supplier stockout breakdown, immediate operational mitigation."
+    },
+    "growth_marketer": {
+      "display_name": "Growth & Marketing Lead",
+      "allowed_kpis": ["net_revenue", "checkout_conversion_rate", "customer_nps", "gross_margin_pct"],
+      "unmasked_fields": ["ad_roas", "competitor_price_index", "conversion_by_campaign", "funnel_dropoff"],
+      "masked_fields": ["gross_margin_pct"],
+      "action_decision_rights": ["campaign_budget_pause", "promotional_voucher_grant", "retargeting_creative_shift", "email_winback_trigger"],
+      "narrative_focus": "Funnel conversion, competitor promotional pressures, CAC/ROAS impact, customer sentiment and campaign interventions."
+    },
+    "data_analyst": {
+      "display_name": "Lead Data & BI Analyst",
+      "allowed_kpis": ["net_revenue", "checkout_conversion_rate", "stockout_rate", "customer_nps", "gross_margin_pct"],
+      "unmasked_fields": ["all_fields", "raw_sql", "statistical_p_values", "shapley_weights", "telemetry_logs", "calibration_priors"],
+      "masked_fields": [],
+      "action_decision_rights": ["calibrate_bayesian_priors", "update_semantic_threshold", "override_attribution_weights", "deploy_dag_fix"],
+      "narrative_focus": "Deterministic mathematical decomposition, statistical test metrics, anomaly confidence bounds, data quality audit, and feedback calibration."
+    }
+  }
+}
